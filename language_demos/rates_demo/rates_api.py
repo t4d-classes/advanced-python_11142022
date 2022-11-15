@@ -1,18 +1,26 @@
 """ rates api """
 
-from flask import Flask, Response
+from typing import Any
+import math
+import pathlib
+import time
+from flask import Flask, Response, request, jsonify, abort
+
+rates: list[dict[str,Any]] = []
 
 app = Flask(__name__)
 
-@app.route("/") # decorator
-def hello_world() -> Response:
-    """ hello world """
-    return "<b>Hello, World!</b>"
-
-@app.route("/goodnight")
-def goodnight_world() -> Response:
-    """ hello world """
-    return "<b>Good Night, World!</b>"
+@app.route("/check") 
+def check() -> Response:
+    """ health check envdpoint """
+    return "READY"
 
 
-app.run(port=5050)
+def start_rates_api() -> None:
+    """ start rates api """
+
+    app.run(port=5050)
+
+
+if __name__ == "__main__":
+    start_rates_api()

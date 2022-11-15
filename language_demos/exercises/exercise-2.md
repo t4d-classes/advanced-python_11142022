@@ -2,13 +2,13 @@
 
 How to run the client and server.
 
-From the `python_demos` folder, run the server:
+From the `language_demos` folder, run the server:
 
 ```bash
 python -m rates_demo.rates_api
 ```
 
-From the `python_demos` folder, run the client:
+From the `language_demos` folder, run the client:
 
 ```bash
 python -m rates_demo 

@@ -12,7 +12,7 @@ rates: list[dict[str,Any]] = []
 
 app = Flask(__name__)
 
-@app.route("/check") 
+@app.route("/check")
 def check() -> Response:
     """ health check endpoint """
     return "READY"
@@ -28,11 +28,11 @@ def check() -> Response:
 #     }
 # }
 
-@app.route("/api/<rate_date>") 
+@app.route("/api/<rate_date>")
 def rates_by_date(rate_date: str) -> Response:
     """ rates by date endpoint """
 
-    time.sleep(0.1)
+    time.sleep(0.5)
 
     for rate in rates:
 

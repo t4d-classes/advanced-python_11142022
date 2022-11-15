@@ -1,32 +1,20 @@
 """  rate demo package """
 
-from datetime import date, timedelta
-import requests
+import time
 
-from rates_demo.business_days import business_days
-
-def get_rates() -> None:
-
-    rates_list = []
-
-    start_date = date(2021, 1, 1)
-    end_date = start_date + timedelta(days=20)
-
-    for current_date in business_days(start_date, end_date):
-
-        rates_url = (
-            "http://127.0.0.1:5050/api/"
-            f"{current_date}"
-            "?base=INR&symbols=USD,EUR"
-        )
-
-        resp = requests.get(rates_url)
-        rates_list.append(resp.text)
-
-    print(rates_list)
+from rates_demo.rates_api_server import rates_api_server
+from rates_demo.get_rates import get_rates, get_rates_threaded
 
 if __name__ == "__main__":
 
-    get_rates()
+    health_check_url = "http://localhost:5050/check"
 
+    with rates_api_server(health_check_url):
 
+        start_time = time.time()
+        get_rates()
+        print(f"non-threaded: {time.time() - start_time}")
+
+        start_time = time.time()
+        get_rates_threaded()
+        print(f"threaded: {time.time() - start_time}")

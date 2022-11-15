@@ -18,7 +18,7 @@ python -m rates_demo
 
 2. Install the "requests" package from PyPi.org.
 
-https://docs.python-requests.org/en/master/user/quickstart/#make-a-request
+https://pypi.org/project/requests/
 
 3. Using the "requests" package API, call the following URL for each date returned from the "business_days" function. Import the `business_days` function from the `business_days` module.
 

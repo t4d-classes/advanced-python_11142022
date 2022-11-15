@@ -24,7 +24,7 @@ https://docs.python-requests.org/en/master/user/quickstart/#make-a-request
 
 http://127.0.0.1:5000/api/2021-04-08?base=INR&symbols=USD,EUR
 
-Specify a start date and then iterate over the next 20 days, and for each business day in the 20 days, get the rate information from the rates API.
+Specify a start date and an end date, and for each business day in the range, get the rate information from the rates API.
 
 4. Create a list of text values from each response. The text value is formatted as JSON. Do not parse the JSON. Just put each JSON response in the list.
 

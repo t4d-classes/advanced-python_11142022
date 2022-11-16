@@ -5,6 +5,15 @@ import sys
 import socket
 
 
+# Create "ClientConnectionThread" class that inherits from "Thread"
+
+# Each time a client connects, a new thread should be created with the
+# "ClientConnectionThread" class. The class is responsible for sending the
+# welcome message and interacting with the client, echoing messages
+
+# The server should support multiple clients at the same time
+
+
 def rate_server(host: str, port: int) -> None:
     """rate server"""
 

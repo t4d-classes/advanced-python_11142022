@@ -50,13 +50,15 @@ def command_status(
 
 
 def command_exit(
-    server_process: Optional[mp.Process]) -> None:
+    server_process: Optional[mp.Process]) -> Optional[mp.Process]:
     """ command exit """
 
     if server_process and server_process.is_alive():
         server_process.terminate()
 
     server_process = None
+
+    return server_process
 
 
 def main() -> None:
@@ -77,15 +79,14 @@ def main() -> None:
             elif command == "status":
                 command_status(server_process)
             elif command == "exit":
-                command_exit(server_process)
+                server_process = command_exit(server_process)
                 break
 
     except KeyboardInterrupt:
-        command_exit(server_process)
+        server_process = command_exit(server_process)
 
     sys.exit(0)
 
 
 if __name__ == '__main__':
     main()
-    

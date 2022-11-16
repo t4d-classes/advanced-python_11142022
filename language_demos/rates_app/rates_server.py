@@ -3,6 +3,28 @@ from typing import Optional
 import multiprocessing as mp
 import sys
 import socket
+import threading
+
+class ClientConnectionThread(threading.Thread):
+    """ client connection thread """
+
+    def __init__(self, conn: socket.socket):
+        threading.Thread.__init__(self)
+        self.conn = conn
+
+    def run(self) -> None:
+
+        self.conn.sendall(b"Connected to the Rates Server")
+
+        while True:
+
+            message = self.conn.recv(2048).decode("UTF-8")
+
+            if not message:
+                break
+
+            print(f"recv: {message}")
+            self.conn.sendall(message.encode('UTF-8'))     
 
 
 # Create "ClientConnectionThread" class that inherits from "Thread"
@@ -24,21 +46,14 @@ def rate_server(host: str, port: int) -> None:
 
         print(f"server is listening on {host}:{port}")
 
-        conn, addr = socket_server.accept()
-
-        print(f"client at {addr[0]}:{addr[1]} connected")
-
-        conn.sendall(b"Connected to the Rates Server")
-
         while True:
+            conn, addr = socket_server.accept()
+            print(f"client at {addr[0]}:{addr[1]} connected")
+            a_thread = ClientConnectionThread(conn)
+            a_thread.start()
 
-            message = conn.recv(2048).decode("UTF-8")
 
-            if not message:
-                break
 
-            print(f"recv: {message}")
-            conn.sendall(message.encode('UTF-8'))
 
 
 

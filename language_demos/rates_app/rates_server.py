@@ -7,6 +7,18 @@ import sys
 def rate_server() -> None:
     """rate server"""
 
+    # implement socket server
+    # the host and port should be received as parameters into this function
+
+    # - use "AF_INET" for IPv4
+    # - use "SOCK_STREAM" for TCP
+
+    # when a client connects, send the following string:
+    #     "Connected to the Rate Server"
+
+    # wire up an echo server which receives a string and echos back to
+    # the client the string that is received
+
     while True:
         pass
 
@@ -17,6 +29,7 @@ def command_start_server(server_process: Optional[mp.Process]) -> mp.Process:
     if server_process and server_process.is_alive():
         print("server is already running")
     else:
+        # HINT: READ PYTHON DOCS ON HOW TO PASS PARAMETERS TO A NEW PROCESS
         server_process = mp.Process(target=rate_server)
         server_process.start()
         print("server started")
@@ -67,6 +80,10 @@ def main() -> None:
     try:
 
         server_process: Optional[mp.Process] = None
+
+        # define the host and port variables here
+        # host: 127.0.0.1
+        # port: 5050
 
         while True:
 

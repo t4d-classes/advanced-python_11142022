@@ -5,6 +5,17 @@ import multiprocessing as mp
 import sys
 import socket
 import threading
+import re
+import requests
+
+
+CLIENT_COMMAND_PARTS = (
+    r"^(?P<name>[A-Z]+) "
+    r"(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2}) "
+    r"(?P<symbol>[A-Z]{3})$"
+)
+
+CLIENT_COMMAND_REGEX = re.compile(CLIENT_COMMAND_PARTS)
 
 # Add support for the following client command
 
@@ -48,13 +59,27 @@ class ClientConnectionThread(threading.Thread):
 
             while True:
 
-                message = self.conn.recv(2048).decode("UTF-8")
+                command = self.conn.recv(2048).decode("UTF-8")
 
-                if not message:
+                if not command:
                     break
 
-                print(f"recv: {message}")
-                self.conn.sendall(message.encode('UTF-8'))
+                command_match = CLIENT_COMMAND_REGEX.match(command)
+
+                if not command_match:
+                    self.conn.sendall(b"Invalid Command Format")
+                    continue
+
+                command_dict = command_match.groupdict()
+                command_name = command_dict["name"]
+                currency_date = command_dict["date"]
+                currency_symbol = command_dict["symbol"]
+
+                self.process_client_command(
+                    command_name, currency_date, currency_symbol
+                )
+
+                
         
         except ConnectionAbortedError:
             pass
@@ -62,6 +87,27 @@ class ClientConnectionThread(threading.Thread):
         finally:
             with self.client_count.get_lock():
                 self.client_count.value -= 1
+
+
+    def process_client_command(
+        self, command_name: str,
+        currency_date: str, currency_symbol: str) -> None:
+        """ process client command """
+
+        if command_name != "GET":
+            self.conn.sendall(b"Invalid Command")
+            return
+
+        resp = requests.get((
+            "http://127.0.0.1:5060"
+            f"/api/{currency_date}"
+            f"?base=USD&symbols={currency_symbol}"), timeout=60)
+
+        currency_rate = resp.json()["rates"][currency_symbol]
+
+        self.conn.sendall(
+            f"{currency_symbol}: {currency_rate}".encode("UTF-8"))
+
 
 
 def rate_server(host: str, port: int, client_count: Synchronized) -> None:

@@ -71,7 +71,7 @@ def start_rates_api() -> None:
 
     rates = load_rates_from_history(rates_file_path)
 
-    app.run(port=5050)
+    app.run(port=5060)
 
 
 if __name__ == "__main__":

@@ -61,15 +61,11 @@ def rate_server(host: str, port: int, client_count: Synchronized) -> None:
             conn, addr = socket_server.accept()
             print(f"client at {addr[0]}:{addr[1]} connected")
 
-            a_thread = ClientConnectionThread(conn, client_count)
-            a_thread.start()
-
             with client_count.get_lock():
                 client_count.value += 1
 
-
-
-
+            a_thread = ClientConnectionThread(conn, client_count)
+            a_thread.start()
 
 
 def command_start_server(

@@ -6,12 +6,31 @@ import sys
 import socket
 import threading
 
-# Use a multiprocessing shared "Value" object to track the count of
-# connected clients
-# increment the count when a client connects, and decrement the count when
-# a client disconnects
-# add a new server command named "count" that displays the count of
-# connected clients
+# Add support for the following client command
+
+# GET 2019-01-03 EUR
+
+# GET is the command name
+# 2019-01-03 is the date of the current rates to retrieve
+# EUR is the currency symbol to retrieve, DO NOT USE USD
+
+# Call the Rates API using the USD as the base to get the currency rate
+# for the specified date and return the client application
+
+# Ideally your code will do the following:
+
+# 1. Use a regular expression with named capture groups to extract parts
+# of the command
+
+# 2. Add a function named "process_client_command" to
+# "ClientConnectionThread" that will process the parsed command including
+# calling the API, extracting the API response, and send back the rate
+# value to the client
+
+# Data comes back as JSON
+
+# *3. Send back an error message for an incorrectly formatted command or an
+# unsupported command name (only the GET command is supported)
 
 class ClientConnectionThread(threading.Thread):
     """ client connection thread """
@@ -43,8 +62,6 @@ class ClientConnectionThread(threading.Thread):
         finally:
             with self.client_count.get_lock():
                 self.client_count.value -= 1
-
-          
 
 
 def rate_server(host: str, port: int, client_count: Synchronized) -> None:

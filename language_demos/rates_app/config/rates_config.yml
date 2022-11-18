@@ -1,0 +1,8 @@
+server:
+  host: 127.0.0.1
+  port: 5025
+database:
+  server: 127.0.0.1,1433
+  database: ratesapp
+  username: sa
+  password: sqlDbp@ss

@@ -1,14 +1,17 @@
 """ rate server module """
-from typing import Optional
+from typing import Optional, Any
 from multiprocessing.sharedctypes import Synchronized
+from decimal import Decimal
 import multiprocessing as mp
 import sys
 import socket
 import threading
 import re
+import decimal
+import pathlib
 import pyodbc
 import requests
-
+import yaml
 
 conn_string = (
     "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -19,29 +22,43 @@ conn_string = (
 )
 
 
-# Task 1 - Cache Rate Results
-
-# Upgrade the application to check the database for a given exchange rate
-# (date, currency)
-
-# If the exchange rate was previously retrieved and stored in the
-# database (inside the rates table), then return it
-
-# If the exchange rate is not in the database, then download it, add it to
-# the database and return it
-
-# Task 2 - Clear Rate Cache
-
-# Add a command for clearing the rate cache from the server command
-# prompt. Name the command "clear".
+# GET 2021-01-03 EUR,GBP:CAD;HKD|INR
 
 CLIENT_COMMAND_PARTS = (
     r"^(?P<name>[A-Z]+) "
     r"(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2}) "
-    r"(?P<symbol>[A-Z]{3})$"
+    r"(?P<symbol>[A-Z,:|;]+)$"
 )
 
 CLIENT_COMMAND_REGEX = re.compile(CLIENT_COMMAND_PARTS)
+
+def read_config() -> Any:
+    """" read config """
+
+    with open(
+        pathlib.Path("rates_app", "config", "rates_config.yml"),
+        encoding="UTF-8") as config_file:
+
+        return yaml.load(config_file, Loader=yaml.SafeLoader)
+
+def get_rate_from_api(
+    closing_date: str,
+    currency_symbol: str,
+    currency_rates: list[tuple[str, str, Decimal]]) -> None:
+    """ get_rate_from_api """
+
+    decimal.getcontext().prec = 4
+
+    resp = requests.get((
+        "http://127.0.0.1:5060"
+        f"/api/{closing_date}"
+        f"?base=USD&symbols={currency_symbol}"), timeout=60)
+
+    currency_rates.append(
+        (closing_date,
+        currency_symbol,
+        round(float(resp.json()["rates"][currency_symbol]), 4) ))
+
 
 class ClientConnectionThread(threading.Thread):
     """ client connection thread """
@@ -91,47 +108,85 @@ class ClientConnectionThread(threading.Thread):
 
     def process_client_command(
         self, command_name: str,
-        currency_date: str, currency_symbol: str) -> None:
+        currency_date: str, currency_symbol_str: str) -> None:
         """ process client command """
 
         if command_name != "GET":
             self.conn.sendall(b"Invalid Command")
             return
 
-        with pyodbc.connect(conn_string) as con:            
+        with pyodbc.connect(conn_string) as con:
+
+            # parse the currency symbols
+
+            currency_symboles_re = re.compile(r"[,:|;]")
+            currency_symbols = currency_symboles_re.split(currency_symbol_str)
+            placeholders = ",".join("?" * len(currency_symbols))
+
+            # query the cache for the currency symbols for a given date
 
             rates_sql = (
-                "select exchangerate as exchange_rate from rates "
-                "where closingdate = ? and currencysymbol = ?"
+                "select closingdate as closing_date, "
+                "currencysymbol as currency_symbol, "
+                "exchangerate as exchange_rate from rates "
+                f"where closingdate = ? and currencysymbol in ({placeholders})"
             )
 
-            rates = con.execute(rates_sql, (currency_date, currency_symbol))
+            cached_currency_symbols: set[str] = set()
+            rate_responses = []
+
+            rates_sql_param = [currency_date]
+            rates_sql_param.extend(currency_symbols)
+
+            rates = con.execute(rates_sql, rates_sql_param)
 
             for rate in rates:
-                self.conn.sendall(
-                    f"{currency_symbol}: {rate.exchange_rate}".encode("UTF-8"))
-                return
+                cached_currency_symbols.add(rate.currency_symbol)
+                rate_responses.append(
+                    f"{rate.currency_symbol}: {rate.exchange_rate}")
 
-            resp = requests.get((
-                "http://127.0.0.1:5060"
-                f"/api/{currency_date}"
-                f"?base=USD&symbols={currency_symbol}"), timeout=60)
+            # getting the rates of the uncached currency symbols
 
-            currency_rate = resp.json()["rates"][currency_symbol]
-
-            insert_rate_sql = (
-                "insert into rates (closingdate, currencysymbol, exchangerate) "
-                "values (?, ?, ?)"
-            )
-
-            con.execute(
-                insert_rate_sql,
-                (currency_date, currency_symbol, currency_rate))
+            currency_rate_from_api_threads: list[threading.Thread] = []
+            currency_rates: list[tuple[str, str, Decimal]] = []
 
 
-            self.conn.sendall(
-                f"{currency_symbol}: {currency_rate}".encode("UTF-8"))
+            for currency_symbol in currency_symbols:
+                if currency_symbol not in cached_currency_symbols:
+                    a_thread = threading.Thread(
+                        target=get_rate_from_api,
+                        args=(currency_date, currency_symbol, currency_rates))
 
+                    a_thread.start()
+                    currency_rate_from_api_threads.append(a_thread)
+
+
+            for a_thread in currency_rate_from_api_threads:
+                a_thread.join()
+
+            # add rates from the api to the cache and response
+
+            if len(currency_rates) > 0:
+
+                decimal.getcontext().prec = 4
+
+                with con.cursor() as cur:
+
+                    insert_rates_sql = (
+                        "insert into rates "
+                        "(closingdate, currencysymbol, exchangerate) "
+                        "values (?, ?, ?)"
+                    )
+
+                    print(currency_rates)
+
+                    cur.executemany(insert_rates_sql, currency_rates)
+
+                    for currency_rate in currency_rates:
+                        rate_responses.append(
+                            f"{currency_rate[1]}: {currency_rate[2]}")
+
+            self.conn.sendall("\n".join(rate_responses).encode("UTF-8"))
 
 
 def rate_server(host: str, port: int, client_count: Synchronized) -> None:
@@ -225,17 +280,13 @@ def command_exit(
     return server_process
 
 
-def main() -> None:
+def main(host: str, port: int) -> None:
     """Main Function"""
 
     try:
 
         server_process: Optional[mp.Process] = None
         client_count: Synchronized = mp.Value('i', 0)
-
-        # define the host and port variables here
-        host = "127.0.0.1"
-        port = 5050
 
         while True:
 
@@ -263,4 +314,5 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    config = read_config()
+    main(config["server"]["host"], int(config["server"]["port"]))

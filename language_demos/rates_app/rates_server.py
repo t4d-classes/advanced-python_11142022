@@ -6,7 +6,17 @@ import sys
 import socket
 import threading
 import re
+import pyodbc
 import requests
+
+
+conn_string = (
+    "DRIVER={ODBC Driver 17 for SQL Server};"
+    "SERVER=localhost,1433;"
+    "DATABASE=ratesapp;"
+    "UID=sa;"
+    "PWD=sqlDbp@ss;"
+)
 
 
 # Task 1 - Cache Rate Results
@@ -88,15 +98,39 @@ class ClientConnectionThread(threading.Thread):
             self.conn.sendall(b"Invalid Command")
             return
 
-        resp = requests.get((
-            "http://127.0.0.1:5060"
-            f"/api/{currency_date}"
-            f"?base=USD&symbols={currency_symbol}"), timeout=60)
+        with pyodbc.connect(conn_string) as con:            
 
-        currency_rate = resp.json()["rates"][currency_symbol]
+            rates_sql = (
+                "select exchangerate as exchange_rate from rates "
+                "where closingdate = ? and currencysymbol = ?"
+            )
 
-        self.conn.sendall(
-            f"{currency_symbol}: {currency_rate}".encode("UTF-8"))
+            rates = con.execute(rates_sql, (currency_date, currency_symbol))
+
+            for rate in rates:
+                self.conn.sendall(
+                    f"{currency_symbol}: {rate.exchange_rate}".encode("UTF-8"))
+                return
+
+            resp = requests.get((
+                "http://127.0.0.1:5060"
+                f"/api/{currency_date}"
+                f"?base=USD&symbols={currency_symbol}"), timeout=60)
+
+            currency_rate = resp.json()["rates"][currency_symbol]
+
+            insert_rate_sql = (
+                "insert into rates (closingdate, currencysymbol, exchangerate) "
+                "values (?, ?, ?)"
+            )
+
+            con.execute(
+                insert_rate_sql,
+                (currency_date, currency_symbol, currency_rate))
+
+
+            self.conn.sendall(
+                f"{currency_symbol}: {currency_rate}".encode("UTF-8"))
 
 
 
@@ -170,6 +204,14 @@ def command_count(client_count: Synchronized) -> None:
 
     print(client_count.value)
 
+def command_clear_cache() -> None:
+    """ command clear cache """
+
+    with pyodbc.connect(conn_string) as con:
+        con.execute("delete from rates")
+
+    print("cache cleared")
+
 
 def command_exit(
     server_process: Optional[mp.Process]) -> Optional[mp.Process]:
@@ -208,6 +250,8 @@ def main() -> None:
                 command_status(server_process)
             elif command == "count":
                 command_count(client_count)
+            elif command == "clear":
+                command_clear_cache()
             elif command == "exit":
                 server_process = command_exit(server_process)
                 break
